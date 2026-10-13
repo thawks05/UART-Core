@@ -27,46 +27,79 @@ reg [2:0] bit_cnt;
 reg serial_bit;
 
 //prevents metastability
-always @(posedge clk) begin
-    reg first_pass <= serial_in;
-    reg second_pass <= first_pass; 
-    serial_bit <= second_pass;
+reg first_pass;
 
+always @(posedge clk) begin
+    first_pass <= serial_in;
+    serial_bit <= first_pass; 
+
+    //reset to 1 since line idles high
     if (rst) begin
-        first_pass <= 1'b0;
-        second_pass <= 1'b0;
+        first_pass <= 1'b1;
+        serial_bit <= 1'b1;
     end    
 end     
 
 //shift register
 always @(posedge clk) begin
         if (rst) begin
-            sipo_reg <= 7'b00000001;
+            sipo_reg <= 8'b00000000;
         end else begin
-            if (tick) begin
+            if ((tick) && (tick_cnt == 4'b1111) && (rx_state == DATA)) begin
                 //LSB added to front, after 8 serial ins, LSB will be at back
-                sipo_reg <= {serial_bit, sipo_reg[6:0]}
+                sipo_reg <= {serial_bit, sipo_reg[7:1]};
             end    
         end        
 end  
 
 //moore finite state machine
 always @(posedge clk) begin
+    done <= 1'b0;
     case (rx_state)
         /*fill in later*/
-        IDLE begin
+        IDLE: begin
             if ((tick) && (!serial_bit)) begin
                 rx_state <= START;
+                done <= 1'b0;
+                err_flag <= 1'b0;
             end    
         end    
-        START begin
-            if ((tick) && (!serial_bit) && (tick_cnt == ))
-        end else begin
-        end    
+        START: begin
+            if ((tick) && (!serial_bit) && (tick_cnt == 4'b0111)) begin
+                rx_state <= DATA;
+            end else begin
+                if ((tick) && (tick_cnt == 4'b0111) && (serial_bit)) begin
+                    rx_state <= IDLE;
+                end   
+            end    
+        end
+        DATA: begin
+            if ((tick) && (bit_cnt == 3'b111) && (tick_cnt == 4'b1111)) begin
+                rx_state <= STOP;
+            end    
+        end
+        STOP: begin
+            if ((tick) && (tick_cnt == 4'b1111) && (serial_bit)) begin
+                done<=1'b1;
+                err_flag <= 1'b0;
+                rx_state <= IDLE;
+            end else begin
+                if ((tick) && (tick_cnt == 4'b1111) && (!serial_bit)) begin
+                    err_flag <= 1'b1;
+                    done <= 1'b1;
+                    rx_state <= IDLE;
+                end    
+            end    
+        end            
         default begin
-            rx_state = IDLE;
+            rx_state <= IDLE;
         end    
     endcase     
+    if (rst) begin
+        rx_state <= IDLE;
+        done <= 1'b0;
+        err_flag <= 1'b0;
+    end        
 end    
 
 //RX four bit counter 
@@ -78,9 +111,11 @@ always @(posedge clk) begin
 
     end    
     */
-
+    if (rx_state == IDLE) begin
+        tick_cnt <= 4'b0000;
+    end    
     //four bit counter logic
-    if ((tick) && (rx_state == START) && (serial_bit == 1'b0)) begin
+    if ((tick) && (rx_state == START)) begin
         tick_cnt <= tick_cnt + 4'b0001;
 
         if (tick_cnt == 4'b0111) begin
@@ -100,11 +135,7 @@ always @(posedge clk) begin
     if ((tick) && ((rx_state == DATA))) begin
         if (tick_cnt == 4'b1111) begin
             bit_cnt <= bit_cnt + 3'b001;
-        end    
-        if (bit_cnt == 3'b111) begin
-            bit_cnt <= 3'b000;
-            rx_state = STOP;
-        end    
+        end      
     end 
     if (rst) begin
         tick_cnt <= 4'b0000;
