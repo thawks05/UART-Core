@@ -14,7 +14,7 @@ localparam [1:0] START = 2'b01;
 localparam [1:0] DATA = 2'b10;
 localparam [1:0] STOP = 2'b11;
 
-//centralized UART state
+//centralized UART RX state
 reg [1:0] rx_state = IDLE;
 
 //tick counter (16x oversampling)
