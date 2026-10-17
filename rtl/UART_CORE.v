@@ -2,8 +2,6 @@ module UART_CORE (
     input wire clk,
     input wire rst,
     input wire rx_in,
-    //Assign start switch to Boolean Board A7 'V2' Switch
-    input start_switch,
     output wire rx_err_flg,
     output wire rx_done,
     output wire tx_out,
